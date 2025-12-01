@@ -1,0 +1,106 @@
+# Default values for route-llm-gateway
+# This is a YAML-formatted file.
+
+# Image configurations
+image:
+  backend:
+    repository: route-llm-gateway-backend
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  frontend:
+    repository: route-llm-gateway-frontend
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  worker:
+    repository: route-llm-gateway-backend  # Reuse backend image
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+# Replica counts
+replicaCount:
+  backend: 1
+  worker: 1
+  frontend: 1
+
+# Environment variables
+env:
+  # Database
+  databaseUrl: "postgresql+psycopg2://route_llm:route_llm@postgres:5432/route_llm"
+  
+  # Redis
+  redisUrl: "redis://redis:6379/0"
+  
+  # OpenAI defaults
+  openaiDefaultModel: "gpt-4o-mini"
+  
+  # Anthropic defaults
+  anthropicDefaultModel: "claude-3-5-haiku-20241022"
+  
+  # DeepSeek defaults
+  deepseekDefaultModel: "deepseek-chat"
+  
+  # Gemini defaults
+  geminiDefaultModel: "gemini-pro"
+  
+  # Environment
+  env: "production"
+
+# Service configurations
+service:
+  backend:
+    type: ClusterIP
+    port: 8000
+  
+  frontend:
+    type: LoadBalancer
+    port: 80
+
+# Resource limits and requests
+resources:
+  backend:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  
+  worker:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  
+  frontend:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "128Mi"
+      cpu: "100m"
+
+# Ingress configuration
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations: {}
+  hosts:
+    - host: route-llm-gateway.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Secrets (should be set via external secrets or sealed-secrets)
+secrets:
+  # API keys should be provided via Kubernetes secrets
+  # Example: kubectl create secret generic route-llm-secrets --from-literal=OPENAI_API_KEY=sk-...
+  openaiApiKey: ""
+  anthropicApiKey: ""
+  deepseekApiKey: ""
+  geminiApiKey: ""
+

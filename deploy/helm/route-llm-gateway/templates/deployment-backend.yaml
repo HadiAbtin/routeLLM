@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "route-llm-gateway.fullname" . }}-backend
+  labels:
+    {{- include "route-llm-gateway.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.replicaCount.backend }}
+  selector:
+    matchLabels:
+      {{- include "route-llm-gateway.backend.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "route-llm-gateway.backend.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: backend
+        image: "{{ .Values.image.backend.repository }}:{{ .Values.image.backend.tag }}"
+        imagePullPolicy: {{ .Values.image.backend.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        env:
+        - name: DATABASE_URL
+          value: {{ .Values.env.databaseUrl | quote }}
+        - name: REDIS_URL
+          value: {{ .Values.env.redisUrl | quote }}
+        - name: OPENAI_DEFAULT_MODEL
+          value: {{ .Values.env.openaiDefaultModel | quote }}
+        - name: ANTHROPIC_DEFAULT_MODEL
+          value: {{ .Values.env.anthropicDefaultModel | quote }}
+        - name: DEEPSEEK_DEFAULT_MODEL
+          value: {{ .Values.env.deepseekDefaultModel | quote }}
+        - name: GEMINI_DEFAULT_MODEL
+          value: {{ .Values.env.geminiDefaultModel | quote }}
+        - name: ENV
+          value: {{ .Values.env.env | quote }}
+        {{- if .Values.secrets.openaiApiKey }}
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "route-llm-gateway.fullname" . }}-secrets
+              key: openai-api-key
+        {{- end }}
+        {{- if .Values.secrets.anthropicApiKey }}
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "route-llm-gateway.fullname" . }}-secrets
+              key: anthropic-api-key
+        {{- end }}
+        {{- if .Values.secrets.deepseekApiKey }}
+        - name: DEEPSEEK_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "route-llm-gateway.fullname" . }}-secrets
+              key: deepseek-api-key
+        {{- end }}
+        {{- if .Values.secrets.geminiApiKey }}
+        - name: GEMINI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "route-llm-gateway.fullname" . }}-secrets
+              key: gemini-api-key
+        {{- end }}
+        resources:
+          {{- toYaml .Values.resources.backend | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+

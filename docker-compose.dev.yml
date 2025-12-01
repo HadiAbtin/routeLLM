@@ -1,0 +1,78 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: deploy/docker/backend.Dockerfile
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    env_file:
+      - .env.backend
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://route_llm:route_llm@postgres:5432/route_llm
+      - REDIS_URL=redis://redis:6379/0
+      # OpenAI settings can be set via .env.backend or environment variables
+      # OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # OPENAI_DEFAULT_MODEL=${OPENAI_DEFAULT_MODEL:-gpt-4o-mini}
+      # OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
+
+  worker:
+    build:
+      context: .
+      dockerfile: deploy/docker/backend.Dockerfile
+    command: ["python", "worker.py"]
+    depends_on:
+      - backend
+      - redis
+      - postgres
+    env_file:
+      - .env.backend
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://route_llm:route_llm@postgres:5432/route_llm
+      - REDIS_URL=redis://redis:6379/0
+
+  frontend:
+    build:
+      context: .
+      dockerfile: deploy/docker/frontend.Dockerfile
+      args:
+        - VITE_API_BASE_URL=http://localhost:8000
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: route_llm
+      POSTGRES_PASSWORD: route_llm
+      POSTGRES_DB: route_llm
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./deploy/docker/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    ports:
+      - "9090:9090"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+

@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "route-llm-gateway.fullname" . }}-worker
+  labels:
+    {{- include "route-llm-gateway.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.replicaCount.worker }}
+  selector:
+    matchLabels:
+      {{- include "route-llm-gateway.worker.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "route-llm-gateway.worker.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: worker
+        image: "{{ .Values.image.worker.repository }}:{{ .Values.image.worker.tag }}"
+        imagePullPolicy: {{ .Values.image.worker.pullPolicy }}
+        command: ["python", "worker.py"]
+        env:
+        - name: DATABASE_URL
+          value: {{ .Values.env.databaseUrl | quote }}
+        - name: REDIS_URL
+          value: {{ .Values.env.redisUrl | quote }}
+        - name: OPENAI_DEFAULT_MODEL
+          value: {{ .Values.env.openaiDefaultModel | quote }}
+        - name: ANTHROPIC_DEFAULT_MODEL
+          value: {{ .Values.env.anthropicDefaultModel | quote }}
+        - name: DEEPSEEK_DEFAULT_MODEL
+          value: {{ .Values.env.deepseekDefaultModel | quote }}
+        - name: GEMINI_DEFAULT_MODEL
+          value: {{ .Values.env.geminiDefaultModel | quote }}
+        - name: ENV
+          value: {{ .Values.env.env | quote }}
+        {{- if .Values.secrets.openaiApiKey }}
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "route-llm-gateway.fullname" . }}-secrets
+              key: openai-api-key
+        {{- end }}
+        {{- if .Values.secrets.anthropicApiKey }}
+        - name: ANTHROPIC_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "route-llm-gateway.fullname" . }}-secrets
+              key: anthropic-api-key
+        {{- end }}
+        {{- if .Values.secrets.deepseekApiKey }}
+        - name: DEEPSEEK_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "route-llm-gateway.fullname" . }}-secrets
+              key: deepseek-api-key
+        {{- end }}
+        {{- if .Values.secrets.geminiApiKey }}
+        - name: GEMINI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "route-llm-gateway.fullname" . }}-secrets
+              key: gemini-api-key
+        {{- end }}
+        resources:
+          {{- toYaml .Values.resources.worker | nindent 10 }}
+
