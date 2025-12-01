@@ -8,7 +8,7 @@ import base64
 from app.config import get_settings
 from app.schemas import ChatRequest, ChatResponse, ChatResponseMessage, Usage, ChatMessage
 from app.providers.base import BaseProvider, resolve_storage_path
-from app.providers.errors import ProviderRateLimitError, ProviderTransientError, ProviderClientError
+from app.providers.errors import ProviderRateLimitError, ProviderTransientError, ProviderClientError, ProviderAuthenticationError
 
 logger = logging.getLogger(__name__)
 
@@ -229,6 +229,9 @@ class AnthropicProvider(BaseProvider):
                         )
                     elif response.status_code >= 500:
                         raise ProviderTransientError(f"Anthropic API server error: {full_error}")
+                    elif response.status_code == 401 or "authentication" in error_type.lower() or ("invalid" in error_message.lower() and "api-key" in error_message.lower()):
+                        # Authentication errors: disable the key and allow failover to another key
+                        raise ProviderAuthenticationError(f"Anthropic API authentication error: {full_error}")
                     else:
                         raise ProviderClientError(f"Anthropic API client error: {full_error}")
                 

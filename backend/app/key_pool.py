@@ -22,6 +22,7 @@ class KeyUsageState:
 _rpm_state: dict[str, KeyUsageState] = {}
 
 # Simple round-robin index per provider
+# Stored in Redis to persist across restarts
 _round_robin_index: dict[str, int] = defaultdict(int)
 
 
@@ -134,39 +135,49 @@ def choose_best_key(
         ProviderKey.status != "disabled"
     ).all()
     
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Decay errors for all keys before selection (opportunistic cleanup)
+    # This ensures cooling periods are properly expired before checking availability
+    for key in keys:
+        decay_key_errors(db, key, settings, now)
+    
+    logger.info(f"Choosing best key for provider '{provider}'. Found {len(keys)} keys (excluding disabled):")
+    for key in keys:
+        logger.info(f"  - {key.display_name} ({str(key.id)[:8]}...): status={key.status}, error_count={key.error_count_recent}, priority={key.priority}, cooling_until={key.cooling_until}")
+    
     if not keys:
+        logger.warning(f"No keys found for provider '{provider}'")
         return None
     
     # Filter by effective active status and cooling
     available_keys = []
     now_ts = time.time()
     
-    import logging
-    logger = logging.getLogger(__name__)
-    
     for key in keys:
         key_id_str = str(key.id)
         
         # Skip excluded keys
         if key_id_str in excluded_key_ids:
-            logger.debug(f"Key {key.display_name} ({key_id_str}) excluded (already tried)")
+            logger.info(f"Key {key.display_name} ({key_id_str}) excluded (already tried)")
             continue
         
         # Check effective active status
         if not is_key_effectively_active(key, now):
             reason = "disabled" if key.status == "disabled" else f"cooling until {key.cooling_until}" if key.cooling_until else "unknown"
-            logger.debug(f"Key {key.display_name} ({key_id_str}) not effectively active: {reason}")
+            logger.info(f"Key {key.display_name} ({key_id_str}) not effectively active: {reason}")
             continue
         
         # Check RPM limit
         if not can_use_key_for_rpm(key, settings, now_ts):
             rpm_state = _rpm_state.get(key_id_str)
             rpm_info = f"RPM: {rpm_state.rpm_count}/{key.max_rpm}" if rpm_state and key.max_rpm else "RPM limit check failed"
-            logger.debug(f"Key {key.display_name} ({key_id_str}) cannot be used: {rpm_info}")
+            logger.info(f"Key {key.display_name} ({key_id_str}) cannot be used: {rpm_info}")
             continue
         
         available_keys.append(key)
-        logger.debug(f"Key {key.display_name} ({key_id_str}) is available (error_count={key.error_count_recent}, priority={key.priority})")
+        logger.info(f"Key {key.display_name} ({key_id_str}) is available (error_count={key.error_count_recent}, priority={key.priority})")
     
     if not available_keys:
         return None
@@ -182,11 +193,35 @@ def choose_best_key(
             logger.info(f"  [{idx}] {key.display_name} ({str(key.id)[:8]}...): score={score}, error_count={key.error_count_recent}, priority={key.priority}")
     
     # Apply round-robin on top
-    index = _round_robin_index[provider] % len(available_keys)
-    selected_key = available_keys[index]
-    _round_robin_index[provider] += 1
+    # Use Redis to persist round-robin index across restarts
+    from app.queue import get_redis_connection
+    redis_client = get_redis_connection()
+    redis_key = f"round_robin_index:{provider}"
     
-    logger.info(f"Selected key for {provider}: {selected_key.display_name} ({str(selected_key.id)[:8]}...) [round-robin index: {index}]")
+    try:
+        # Get current index from Redis, default to 0
+        current_index_str = redis_client.get(redis_key)
+        if current_index_str:
+            current_index = int(current_index_str.decode())
+        else:
+            current_index = 0
+    except (ValueError, AttributeError):
+        current_index = 0
+    
+    # Select key using round-robin
+    index = current_index % len(available_keys)
+    selected_key = available_keys[index]
+    
+    # Increment and store in Redis
+    next_index = current_index + 1
+    try:
+        redis_client.set(redis_key, str(next_index))
+    except Exception as e:
+        logger.warning(f"Failed to update round-robin index in Redis: {e}")
+        # Fallback to in-memory
+        _round_robin_index[provider] = next_index
+    
+    logger.info(f"Selected key for {provider}: {selected_key.display_name} ({str(selected_key.id)[:8]}...) [round-robin index: {index}, next: {next_index}]")
     
     return selected_key
 
@@ -197,9 +232,10 @@ def mark_key_error(
     settings: AppSettings,
     now: datetime,
     is_rate_limit: bool,
+    is_authentication_error: bool = False,
 ) -> None:
     """
-    Mark a key as having an error and set cooling period.
+    Mark a key as having an error.
     
     Args:
         db: Database session
@@ -207,19 +243,34 @@ def mark_key_error(
         settings: AppSettings instance
         now: Current datetime
         is_rate_limit: Whether error was a rate limit (429)
+        is_authentication_error: Whether error was an authentication error (401/invalid key)
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     key.error_count_recent = (key.error_count_recent or 0) + 1
     key.last_error_at = now
     
-    cooldown_seconds = (
-        settings.key_cooldown_seconds_on_429 if is_rate_limit
-        else settings.key_cooldown_seconds_on_network_error
-    )
-    key.cooling_until = now + timedelta(seconds=cooldown_seconds)
-    key.status = "cooling_down"
+    if is_authentication_error:
+        # Authentication errors: disable the key permanently (admin must re-enable)
+        key.status = "disabled"
+        key.cooling_until = None
+        logger.warning(f"Key {key.display_name} ({str(key.id)[:8]}...) disabled due to authentication error")
+    elif is_rate_limit:
+        # Rate limit errors: set cooling period
+        cooldown_seconds = settings.key_cooldown_seconds_on_429
+        key.cooling_until = now + timedelta(seconds=cooldown_seconds)
+        key.status = "cooling_down"
+        logger.info(f"Key {key.display_name} ({str(key.id)[:8]}...) cooling down for {cooldown_seconds}s due to rate limit")
+    else:
+        # Other transient errors: set cooling period
+        cooldown_seconds = settings.key_cooldown_seconds_on_network_error
+        key.cooling_until = now + timedelta(seconds=cooldown_seconds)
+        key.status = "cooling_down"
+        logger.info(f"Key {key.display_name} ({str(key.id)[:8]}...) cooling down for {cooldown_seconds}s due to transient error")
     
     # Record metric
-    error_kind = "rate_limit" if is_rate_limit else "transient"
+    error_kind = "rate_limit" if is_rate_limit else ("authentication" if is_authentication_error else "transient")
     KEY_ERRORS_TOTAL.labels(
         provider=key.provider,
         key_id=str(key.id),
@@ -264,11 +315,24 @@ def decay_key_errors(db: Session, key: ProviderKey, settings: AppSettings, now: 
     
     # Reactivate if cooling period expired
     if key.status == "cooling_down":
-        if not key.cooling_until or key.cooling_until <= now:
-            key.status = "active"
-            key.cooling_until = None
-            db.add(key)
-            db.commit()
+        if key.cooling_until:
+            # Ensure both datetimes are timezone-aware for comparison
+            from datetime import timezone
+            if key.cooling_until.tzinfo is None:
+                cooling_until_aware = key.cooling_until.replace(tzinfo=timezone.utc)
+            else:
+                cooling_until_aware = key.cooling_until
+            
+            if now.tzinfo is None:
+                now_aware = now.replace(tzinfo=timezone.utc)
+            else:
+                now_aware = now
+            
+            if cooling_until_aware <= now_aware:
+                key.status = "active"
+                key.cooling_until = None
+                db.add(key)
+                db.commit()
 
 
 def update_key_usage(db: Session, key: ProviderKey, now: datetime) -> None:

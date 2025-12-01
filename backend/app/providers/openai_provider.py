@@ -7,7 +7,7 @@ import os
 from app.config import get_settings
 from app.schemas import ChatRequest, ChatResponse, ChatResponseMessage, Usage, ChatMessage
 from app.providers.base import BaseProvider
-from app.providers.errors import ProviderRateLimitError, ProviderTransientError, ProviderClientError
+from app.providers.errors import ProviderRateLimitError, ProviderTransientError, ProviderClientError, ProviderAuthenticationError
 from app.models import StoredFile
 
 logger = logging.getLogger(__name__)
@@ -164,6 +164,9 @@ class OpenAIProvider(BaseProvider):
                         )
                     elif response.status_code >= 500:
                         raise ProviderTransientError(f"OpenAI API server error: {error_message}")
+                    elif response.status_code == 401 or "authentication" in error_message.lower() or ("invalid" in error_message.lower() and "api" in error_message.lower()):
+                        # Authentication errors: disable the key and allow failover to another key
+                        raise ProviderAuthenticationError(f"OpenAI API authentication error: {error_message}")
                     else:
                         raise ProviderClientError(f"OpenAI API client error: {error_message}")
                 

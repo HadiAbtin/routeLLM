@@ -47,8 +47,22 @@ def is_key_effectively_active(key: ProviderKey, now: datetime) -> bool:
     if key.status == "disabled":
         return False
     
-    if key.cooling_until and key.cooling_until > now:
-        return False
+    if key.cooling_until:
+        # Ensure both datetimes are timezone-aware for comparison
+        from datetime import timezone
+        
+        if key.cooling_until.tzinfo is None:
+            cooling_until_aware = key.cooling_until.replace(tzinfo=timezone.utc)
+        else:
+            cooling_until_aware = key.cooling_until
+        
+        if now.tzinfo is None:
+            now_aware = now.replace(tzinfo=timezone.utc)
+        else:
+            now_aware = now
+        
+        if cooling_until_aware > now_aware:
+            return False
     
     return True
 

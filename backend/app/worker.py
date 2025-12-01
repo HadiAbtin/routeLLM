@@ -21,7 +21,8 @@ from app.providers.registry import get_provider
 from app.providers.errors import (
     ProviderRateLimitError,
     ProviderTransientError,
-    ProviderClientError
+    ProviderClientError,
+    ProviderAuthenticationError
 )
 from app.config import get_settings
 from app.queue import get_default_queue
@@ -284,39 +285,33 @@ def process_run_job(run_id: str, attempt: int = 1) -> None:
                     logger.error(f"Run {run_id} failed after {max_attempts} attempts: {error_message}")
                     return
                     
+            except ProviderAuthenticationError as e:
+                error_message = str(e)
+                logger.warning(f"Run {run_id} attempt {attempt}: Authentication error with key {selected_key.display_name}: {error_message}")
+                mark_key_error(db, selected_key, settings, now, is_rate_limit=False, is_authentication_error=True)
+                
+                # Refresh key to get updated status
+                db.refresh(selected_key)
+                logger.info(f"Key {selected_key.display_name} disabled due to authentication error")
+                
+                # Continue in the while loop to try next key immediately (if available)
+                # This allows failover to another key without requeuing
+                logger.info(f"Attempting failover to another key for run {run_id}")
+                continue
+                
             except ProviderTransientError as e:
                 error_message = str(e)
-                logger.warning(f"Run {run_id} attempt {attempt}: Transient error: {error_message}")
+                logger.warning(f"Run {run_id} attempt {attempt}: Transient error with key {selected_key.display_name}: {error_message}")
                 mark_key_error(db, selected_key, settings, now, is_rate_limit=False)
                 
-                # Check if we should retry
-                if attempt < max_attempts:
-                    delay = min(
-                        settings.worker_base_backoff_seconds * (2 ** (attempt - 1)),
-                        settings.worker_max_backoff_seconds
-                    )
-                    logger.info(f"Requeuing run {run_id} with {delay}s delay due to transient error")
-                    queue = get_default_queue()
-                    queue.enqueue_in(
-                        timedelta(seconds=delay),
-                        process_run_job,
-                        run_id,
-                        attempt + 1
-                    )
-                    db_run.status = "queued"
-                    db_run.retry_count = attempt
-                    db_run.last_error_reason = f"Transient error: {error_message}"
-                    db.commit()
-                    return
-                else:
-                    # Max attempts reached
-                    db_run.status = "failed"
-                    db_run.error = f"Transient error after {max_attempts} attempts: {error_message}"
-                    db_run.retry_count = attempt
-                    db_run.finished_at = datetime.utcnow()
-                    db.commit()
-                    logger.error(f"Run {run_id} failed after {max_attempts} attempts: {error_message}")
-                    return
+                # Refresh key to get updated status
+                db.refresh(selected_key)
+                logger.info(f"Key {selected_key.display_name} marked as error, status: {selected_key.status}, cooling_until: {selected_key.cooling_until}")
+                
+                # Continue in the while loop to try next key immediately (if available)
+                # This allows failover to another key without requeuing
+                logger.info(f"Attempting failover to another key for run {run_id}")
+                continue
                     
             except ProviderClientError as e:
                 # Non-retriable: mark failed immediately

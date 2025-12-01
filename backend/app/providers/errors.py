@@ -22,6 +22,11 @@ class ProviderTransientError(ProviderError):
     pass
 
 
+class ProviderAuthenticationError(ProviderError):
+    """Raised for authentication errors (401, invalid API key) that should disable the key."""
+    pass
+
+
 class ProviderClientError(ProviderError):
     """Raised for client errors (4xx except 429) that are not retriable."""
     pass

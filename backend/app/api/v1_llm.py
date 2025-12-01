@@ -21,7 +21,8 @@ from app.providers.registry import get_provider
 from app.providers.errors import (
     ProviderRateLimitError,
     ProviderTransientError,
-    ProviderClientError
+    ProviderClientError,
+    ProviderAuthenticationError
 )
 from app.config import get_settings
 from app.metrics import (
@@ -257,6 +258,13 @@ async def chat_completion(
                 last_exception = e
                 mark_key_error(db, selected_key, settings, now, is_rate_limit=True)
                 # Continue to try next key (no sleep in sync endpoint)
+                continue
+                
+            except ProviderAuthenticationError as e:
+                last_exception = e
+                mark_key_error(db, selected_key, settings, now, is_rate_limit=False, is_authentication_error=True)
+                logger.warning(f"Key {selected_key.display_name} disabled due to authentication error, trying next key")
+                # Continue to try next key
                 continue
                 
             except ProviderTransientError as e:

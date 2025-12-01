@@ -263,7 +263,10 @@ export function Keys() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => setDeleteKeyId(key.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteKeyId(key.id);
+                            }}
                             className="inline-flex items-center gap-1.5 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />

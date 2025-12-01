@@ -91,6 +91,20 @@ export function Dashboard() {
     refetchInterval: 10000,
   });
 
+  const { data: recentErrorsData } = useQuery({
+    queryKey: ['recent-errors'],
+    queryFn: async () => {
+      try {
+        const response = await statsApi.getRecentErrors(20);
+        return response.data;
+      } catch (error: any) {
+        return { errors: [] };
+      }
+    },
+    enabled: !!token,
+    refetchInterval: 10000,
+  });
+
   const { data: tokensData, isLoading: tokensLoading } = useQuery({
     queryKey: ['provider-tokens', tokenPeriod],
     queryFn: async () => {
@@ -549,6 +563,61 @@ export function Dashboard() {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </div>
+
+        {/* Recent Errors */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Recent Errors</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">Last 20 failed runs</p>
+          </div>
+          {recentErrorsData?.errors && Array.isArray(recentErrorsData.errors) && recentErrorsData.errors.length > 0 ? (
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {recentErrorsData.errors.map((error: any, idx: number) => {
+                if (!error || typeof error !== 'object') return null;
+                const errorKind = String(error.kind || 'transient');
+                const kindColors: Record<string, string> = {
+                  rate_limit: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300',
+                  client: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300',
+                  authentication: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300',
+                  transient: 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300',
+                };
+                const kindColor = kindColors[errorKind] || kindColors.transient;
+                return (
+                  <div key={idx} className="border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded ${kindColor}`}>
+                            {errorKind.toUpperCase()}
+                          </span>
+                          <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                            {String(error.provider || '').toUpperCase()}
+                          </span>
+                          {error.key_display_name && (
+                            <span className="text-xs text-slate-600 dark:text-slate-400">
+                              ({String(error.key_display_name)})
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-slate-700 dark:text-slate-300 mt-1">
+                          {String(error.message || 'Unknown error')}
+                        </p>
+                      </div>
+                      <span className="text-xs text-slate-500 dark:text-slate-400 ml-4">
+                        {error.timestamp ? new Date(error.timestamp).toLocaleString() : 'Unknown time'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+              <CheckCircle2 className="w-12 h-12 mx-auto mb-2 text-green-500 opacity-50" />
+              <p>No recent errors</p>
             </div>
           )}
         </div>
