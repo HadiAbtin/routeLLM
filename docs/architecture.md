@@ -24,7 +24,7 @@ This document describes the architecture of Route LLM Gateway, a high-performanc
 ### Frontend (React + Vite)
 - **Technology**: React 19, TypeScript, Vite, TailwindCSS
 - **Location**: `frontend/`
-- **Port**: 5173 (dev), 80 (production/Docker)
+- **Port**: 80 (Docker)
 - **Features**:
   - Modern React with TypeScript
   - Vite for fast development and optimized builds
@@ -75,7 +75,7 @@ This document describes the architecture of Route LLM Gateway, a high-performanc
 │   Browser   │
 └──────┬──────┘
        │
-       ├─── localhost:5173 (Frontend)
+       ├─── localhost (Frontend)
        │    └─── React Dashboard
        │
        └─── localhost:8000 (Backend API)

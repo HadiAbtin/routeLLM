@@ -6,7 +6,7 @@ This guide explains how to run route-llm-gateway using Docker Compose for local 
 
 - Docker and Docker Compose installed
 - At least 4GB of available RAM
-- Ports 8000, 5173, 5432, 6379, 9090 available (or modify in `docker-compose.dev.yml`)
+- Ports 80, 8000, 5432, 6379, 9090 available (or modify in `docker-compose.dev.yml`)
 
 ## Quick Start
 
@@ -28,7 +28,7 @@ This guide explains how to run route-llm-gateway using Docker Compose for local 
    ```
 
 4. **Access the services:**
-   - Frontend Dashboard: http://localhost:5173
+   - Frontend Dashboard: http://localhost
    - Backend API: http://localhost:8000
    - API Docs: http://localhost:8000/docs
    - Prometheus: http://localhost:9090
@@ -37,7 +37,7 @@ This guide explains how to run route-llm-gateway using Docker Compose for local 
 
 5. **Login to Dashboard:**
    - Default email: `admin@example.com`
-   - Default password: `admin`
+   - Default password: `Admin123!`
    - ⚠️ **Important**: Change the password on first login!
 
 ## Environment Variables
@@ -83,7 +83,7 @@ The docker-compose setup includes:
   - Token usage tracking with Redis
   - File management
   - Authentication (JWT)
-- **frontend**: React application served by nginx (port 5173)
+- **frontend**: React application served by nginx (port 80)
   - Real-time dashboard with auto-refresh
   - Provider health monitoring
   - Token usage analytics

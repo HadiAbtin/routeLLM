@@ -48,14 +48,14 @@ Detailed token usage analytics with time-based filtering for individual provider
    ```
 
 3. **Access:**
-   - Frontend Dashboard: http://localhost:5173
+   - Frontend Dashboard: http://localhost
    - Backend API: http://localhost:8000
    - API Docs: http://localhost:8000/docs
    - Prometheus: http://localhost:9090
 
 4. **Default Login:**
    - Email: `admin@example.com`
-   - Password: `admin` (change on first login)
+   - Password: `Admin123!` (change on first login)
 
 📖 **Detailed guide**: [Docker Compose Deployment](docs/deploy-docker-compose.md)
 
