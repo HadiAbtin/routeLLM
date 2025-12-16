@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from uuid import UUID
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.db import get_db
 from app.models import Run, User
@@ -102,6 +102,7 @@ def create_run(
         status="pending",
         provider=provider,
         model=run_data.model,
+        max_tokens=run_data.max_tokens,
         input_messages=messages_json,
         idempotency_key=run_data.idempotency_key
     )
@@ -115,10 +116,13 @@ def create_run(
     logger.error(json_lib.dumps(db_run.input_messages, indent=2, ensure_ascii=False))
     logger.error("=" * 60)
     
-    # Enqueue job
+    # Enqueue job with extended timeout (30 minutes for long-running requests)
     try:
+        from app.config import get_settings
+        settings = get_settings()
         queue = get_default_queue()
-        queue.enqueue(process_run_job, str(db_run.id))
+        # Set job_timeout to 30 minutes (1800 seconds) to allow long-running agent runs
+        queue.enqueue(process_run_job, str(db_run.id), job_timeout=settings.provider_timeout_seconds)
         
         # Update status to queued
         db_run.status = "queued"
@@ -184,7 +188,7 @@ def cancel_run(
         )
     
     db_run.status = "canceled"
-    db_run.finished_at = datetime.utcnow()
+    db_run.finished_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(db_run)
     

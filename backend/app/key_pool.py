@@ -3,7 +3,7 @@ from collections import defaultdict
 from typing import Optional, Tuple, Set
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
 
 from app.models import ProviderKey, is_key_effectively_active
@@ -359,7 +359,7 @@ def choose_key_for_provider(db: Session, provider: str) -> ProviderKey:
     from app.config import get_settings
     
     settings = get_settings()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     
     key = choose_best_key(db, provider, settings, now)
     

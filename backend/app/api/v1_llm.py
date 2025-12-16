@@ -4,7 +4,7 @@ import logging
 import time
 from typing import Set, Optional
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.schemas import ChatRequest, ChatResponse
 from app.db import get_db
@@ -146,7 +146,7 @@ async def chat_completion(
     
     try:
         settings = get_settings()
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         excluded: Set[str] = set()
         attempts = 0
         max_attempts = settings.sync_llm_max_retries + 1  # first try + retries
@@ -159,7 +159,7 @@ async def chat_completion(
         # Retry loop with failover across keys
         while attempts < max_attempts:
             attempts += 1
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             now_ts = time.time()
             
             # Choose best available key (excluding previously tried ones)

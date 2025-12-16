@@ -101,6 +101,7 @@ class AgentRunCreate(BaseModel):
     provider: Optional[str] = Field("openai", description="Provider to use")
     model: Optional[str] = Field(None, description="Model to use (optional)")
     messages: list[ChatMessage] = Field(..., min_length=1, description="LLM messages array")
+    max_tokens: Optional[int] = Field(None, gt=0, description="Maximum tokens to generate (uses default if not provided)")
     idempotency_key: Optional[str] = Field(None, description="Idempotency key for duplicate prevention")
 
 

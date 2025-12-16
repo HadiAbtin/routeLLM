@@ -35,6 +35,14 @@ class AppSettings(BaseSettings):
     worker_base_backoff_seconds: int = 5  # Base delay for exponential backoff
     worker_max_backoff_seconds: int = 60  # Maximum backoff delay
     
+    # Provider API timeout settings
+    provider_timeout_seconds: int = 1800  # 30 minutes timeout for long-running requests
+    
+    # Provider default max_tokens settings
+    # Set to maximum allowed by most providers (Anthropic: 64000, OpenAI: varies by model)
+    # If user needs more, they can specify max_tokens in the request
+    default_max_tokens: int = 64000  # Maximum for Anthropic Claude models, safe default for others
+    
     # Auth settings
     auth_jwt_secret_key: str = "CHANGE_ME_IN_ENV"
     auth_jwt_algorithm: str = "HS256"

@@ -5,6 +5,7 @@ services:
       dockerfile: deploy/docker/backend.Dockerfile
     image: route-llm-gateway-backend:${VERSION:-latest}
     restart: unless-stopped
+    container_name: llm-router-core 
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -33,6 +34,7 @@ services:
       - backend_storage:/app/storage
     networks:
       - route-llm-network
+      - shared_net
 
   worker:
     build:
@@ -148,3 +150,6 @@ networks:
   route-llm-network:
     driver: bridge
 
+  shared_net:
+      external: true
+      name: r1ze-bridge

@@ -74,8 +74,9 @@ class GeminiProvider(BaseProvider):
         generation_config: Dict[str, Any] = {}
         if request.temperature is not None:
             generation_config["temperature"] = request.temperature
-        if request.max_tokens is not None:
-            generation_config["maxOutputTokens"] = request.max_tokens
+        # Use request max_tokens if provided, otherwise use default from settings
+        max_tokens = request.max_tokens or settings.default_max_tokens
+        generation_config["maxOutputTokens"] = max_tokens
         
         if generation_config:
             payload["generationConfig"] = generation_config
@@ -92,7 +93,9 @@ class GeminiProvider(BaseProvider):
         
         # Make request to Gemini API
         # Note: Gemini uses API key as query parameter
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        # Use configurable timeout (default 30 minutes for long-running requests)
+        timeout_seconds = settings.provider_timeout_seconds
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
             try:
                 response = await client.post(
                     f"{base_url}/models/{model}:generateContent?key={key}",

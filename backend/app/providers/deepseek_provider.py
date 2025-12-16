@@ -107,8 +107,9 @@ class DeepSeekProvider(BaseProvider):
         # Add optional parameters
         if request.temperature is not None:
             payload["temperature"] = request.temperature
-        if request.max_tokens is not None:
-            payload["max_tokens"] = request.max_tokens
+        # Use request max_tokens if provided, otherwise use default from settings
+        max_tokens = request.max_tokens or settings.default_max_tokens
+        payload["max_tokens"] = max_tokens
         
         # Prepare headers (OpenAI-compatible)
         headers = {
@@ -123,7 +124,9 @@ class DeepSeekProvider(BaseProvider):
             os.environ["HTTPS_PROXY"] = settings.https_proxy
         
         # Make request to DeepSeek API
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        # Use configurable timeout (default 30 minutes for long-running requests)
+        timeout_seconds = settings.provider_timeout_seconds
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
             try:
                 response = await client.post(
                     f"{base_url}/chat/completions",

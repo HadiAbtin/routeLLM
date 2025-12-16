@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict
 import os
 from pathlib import Path
@@ -128,6 +128,6 @@ def health_check() -> Dict[str, str]:
     return {
         "status": "ok",
         "service": "route-llm-gateway",
-        "time": datetime.utcnow().isoformat() + "Z"
+        "time": datetime.now(timezone.utc).isoformat()
     }
 

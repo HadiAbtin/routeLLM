@@ -146,10 +146,19 @@ class AnthropicProvider(BaseProvider):
                 messages.append(anthropic_msg)
         
         # Prepare payload for Anthropic API
+        # Use request max_tokens if provided, otherwise use default from settings
+        # Anthropic has model-specific limits (e.g., claude-opus-4-5: 64000, claude-sonnet-4-5: 8192)
+        # We'll use the default and let API enforce its limits (it will return an error if exceeded)
+        max_tokens = request.max_tokens or settings.default_max_tokens
+        
+        # Cap at Anthropic's maximum (64000 for most models)
+        # This prevents API errors for models with lower limits
+        max_tokens = min(max_tokens, 64000)
+        
         payload: Dict[str, Any] = {
             "model": model,
             "messages": messages,
-            "max_tokens": request.max_tokens or 1024  # Anthropic requires max_tokens
+            "max_tokens": max_tokens  # Anthropic requires max_tokens
         }
         
         # Add system message if present
@@ -190,7 +199,9 @@ class AnthropicProvider(BaseProvider):
                 logger.warning("Simulating transient error for testing")
                 raise ProviderTransientError("Simulated transient error for testing")
         
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        # Use configurable timeout (default 30 minutes for long-running requests)
+        timeout_seconds = settings.provider_timeout_seconds
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
             try:
                 response = await client.post(
                     f"{base_url}/messages",

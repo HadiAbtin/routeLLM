@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException, status, Header
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 
 from app.db import get_db, SessionLocal
@@ -55,7 +55,7 @@ def get_provider_stats(
             keys_by_provider[provider]["cooling_down_keys"] = count
     
     # Get time windows
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     window_15m = now - timedelta(minutes=15)
     window_1h = now - timedelta(hours=1)
     
@@ -156,7 +156,7 @@ def get_provider_timeseries(
     """
     import time
     
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     window_seconds = window_minutes * 60
     window_start = now - timedelta(seconds=window_seconds)
     
@@ -327,7 +327,7 @@ def get_key_stats(
     Get key-level health and usage statistics.
     """
     keys = db.query(ProviderKey).all()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     window_1h = now - timedelta(hours=1)
     
     keys_list = []
@@ -377,7 +377,7 @@ def get_key_errors(
     Get per-key error statistics.
     """
     keys = db.query(ProviderKey).all()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     window_1h = now - timedelta(hours=1)
     
     keys_list = []
@@ -434,7 +434,7 @@ def get_runs_stats(
     """
     Get async runs statistics.
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     window_start = now - timedelta(minutes=window_minutes)
     
     runs = db.query(Run).filter(Run.created_at >= window_start).all()
@@ -558,7 +558,7 @@ def get_debug_key_info(
         raise HTTPException(status_code=404, detail="Key not found")
     
     settings = get_settings()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     now_ts = time.time()
     
     # Check all conditions

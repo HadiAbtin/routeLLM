@@ -3,7 +3,7 @@ Worker module for processing async agent runs.
 """
 import logging
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 from sqlalchemy.orm import Session
 
@@ -62,7 +62,7 @@ def process_run_job(run_id: str, attempt: int = 1) -> None:
         
         # Update status to running
         db_run.status = "running"
-        db_run.started_at = datetime.utcnow()
+        db_run.started_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(db_run)
         
@@ -122,15 +122,20 @@ def process_run_job(run_id: str, attempt: int = 1) -> None:
                     "storage_path": stored_file.storage_path
                 }
         
+        # Get settings first (needed for max_tokens default)
+        settings = get_settings()
+        
+        # Use max_tokens from run if provided, otherwise use default from settings
+        # This ensures agent runs get the same high max_tokens limit (1M) as chat endpoint
+        max_tokens = db_run.max_tokens or settings.default_max_tokens
         chat_request = ChatRequest(
             messages=messages,
             model=db_run.model,
-            provider=db_run.provider
+            provider=db_run.provider,
+            max_tokens=max_tokens
         )
-        
-        settings = get_settings()
         max_attempts = settings.worker_max_attempts
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         now_ts = time.time()
         excluded: Set[str] = set()
         provider = get_provider(db_run.provider)
@@ -157,11 +162,13 @@ def process_run_job(run_id: str, attempt: int = 1) -> None:
                         f"requeuing with {delay}s delay"
                     )
                     queue = get_default_queue()
+                    # Set job_timeout to 30 minutes for retries as well
                     queue.enqueue_in(
                         timedelta(seconds=delay),
                         process_run_job,
                         run_id,
-                        attempt + 1
+                        attempt + 1,
+                        job_timeout=settings.provider_timeout_seconds
                     )
                     db_run.status = "queued"
                     db_run.retry_count = attempt
@@ -173,7 +180,7 @@ def process_run_job(run_id: str, attempt: int = 1) -> None:
                     db_run.status = "failed"
                     db_run.error = "No available keys after all retries"
                     db_run.retry_count = attempt
-                    db_run.finished_at = datetime.utcnow()
+                    db_run.finished_at = datetime.now(timezone.utc)
                     db.commit()
                     logger.error(f"Run {run_id} failed: No available keys after {max_attempts} attempts")
                     return
@@ -212,7 +219,7 @@ def process_run_job(run_id: str, attempt: int = 1) -> None:
                     "role": response.message.role,
                     "content": response.message.content
                 }
-                db_run.finished_at = datetime.utcnow()
+                db_run.finished_at = datetime.now(timezone.utc)
                 db_run.retry_count = attempt - 1  # Number of retries used
                 
                 # Update key usage
@@ -264,11 +271,13 @@ def process_run_job(run_id: str, attempt: int = 1) -> None:
                     
                     logger.info(f"Requeuing run {run_id} with {delay}s delay due to rate limit")
                     queue = get_default_queue()
+                    # Set job_timeout to 30 minutes for retries as well
                     queue.enqueue_in(
                         timedelta(seconds=delay),
                         process_run_job,
                         run_id,
-                        attempt + 1
+                        attempt + 1,
+                        job_timeout=settings.provider_timeout_seconds
                     )
                     db_run.status = "queued"
                     db_run.retry_count = attempt
@@ -280,7 +289,7 @@ def process_run_job(run_id: str, attempt: int = 1) -> None:
                     db_run.status = "failed"
                     db_run.error = f"Rate limit error after {max_attempts} attempts: {error_message}"
                     db_run.retry_count = attempt
-                    db_run.finished_at = datetime.utcnow()
+                    db_run.finished_at = datetime.now(timezone.utc)
                     db.commit()
                     logger.error(f"Run {run_id} failed after {max_attempts} attempts: {error_message}")
                     return
@@ -321,7 +330,7 @@ def process_run_job(run_id: str, attempt: int = 1) -> None:
                 db_run.error = error_message
                 db_run.retry_count = attempt
                 db_run.last_error_reason = f"Client error: {error_message}"
-                db_run.finished_at = datetime.utcnow()
+                db_run.finished_at = datetime.now(timezone.utc)
                 db.commit()
                 return
             
@@ -333,7 +342,7 @@ def process_run_job(run_id: str, attempt: int = 1) -> None:
             if db_run:
                 db_run.status = "failed"
                 db_run.error = f"Worker error: {str(e)}"
-                db_run.finished_at = datetime.utcnow()
+                db_run.finished_at = datetime.now(timezone.utc)
                 db.commit()
         except:
             pass

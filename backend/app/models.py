@@ -77,6 +77,7 @@ class Run(Base):
     status = Column(String(20), default="pending", nullable=False, index=True)  # pending, queued, running, succeeded, failed, canceled
     provider = Column(String(50), nullable=False, index=True)
     model = Column(String(100), nullable=True)
+    max_tokens = Column(Integer, nullable=True)  # Maximum tokens for this run (uses default if None)
     input_messages = Column(JSONB, nullable=False)  # JSON array of messages
     output_message = Column(JSONB, nullable=True)  # JSON message or null
     error = Column(Text, nullable=True)  # Error message if failed
