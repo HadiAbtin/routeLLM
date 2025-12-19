@@ -1,9 +1,7 @@
 services:
   backend:
-    build:
-      context: .
-      dockerfile: deploy/docker/backend.Dockerfile
-    image: route-llm-gateway-backend:${VERSION:-latest}
+    image: ${DOCKERHUB_USERNAME:-hadiabtin}/route-llm-gateway-backend:${VERSION:-latest}
+    platform: linux/amd64
     restart: unless-stopped
     container_name: llm-router-core 
     ports:
@@ -37,10 +35,8 @@ services:
       - shared_net
 
   worker:
-    build:
-      context: .
-      dockerfile: deploy/docker/backend.Dockerfile
-    image: route-llm-gateway-backend:${VERSION:-latest}
+    image: ${DOCKERHUB_USERNAME:-hadiabtin}/route-llm-gateway-backend:${VERSION:-latest}
+    platform: linux/amd64
     restart: unless-stopped
     command: ["python", "worker.py"]
     depends_on:
@@ -71,12 +67,8 @@ services:
       - route-llm-network
 
   frontend:
-    build:
-      context: .
-      dockerfile: deploy/docker/frontend.Dockerfile
-      args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
-    image: route-llm-gateway-frontend:${VERSION:-latest}
+    image: ${DOCKERHUB_USERNAME:-hadiabtin}/route-llm-gateway-frontend:${VERSION:-latest}
+    platform: linux/amd64
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-80}:80"
