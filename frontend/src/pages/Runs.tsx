@@ -3,7 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { AppLayout } from '../components/AppLayout';
 import { Button } from '../components/Button';
 import { useAuthStore } from '../store/authStore';
-import { statsApi } from '../lib/api';
+import { statsApi } from '../lib/api.js';
 import { CheckCircle2, XCircle, Clock, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 

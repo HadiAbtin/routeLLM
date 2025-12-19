@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { authApi } from '../lib/api';
+import { authApi } from '../lib/api.js';
 import { Key, ArrowRight } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn } from '../lib/utils.js';
 
 export function ChangePassword() {
   const [oldPassword, setOldPassword] = useState('');

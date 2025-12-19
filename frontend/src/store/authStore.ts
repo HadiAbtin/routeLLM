@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { authApi, type UserInfo } from '../lib/api';
+import { authApi, type UserInfo } from '../lib/api.js';
 
 interface AuthState {
   token: string | null;

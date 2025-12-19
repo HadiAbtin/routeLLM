@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { AppLayout } from '../components/AppLayout';
 import { useAuthStore } from '../store/authStore';
-import { statsApi } from '../lib/api';
+import { statsApi } from '../lib/api.js';
 
 export function Providers() {
   const { token } = useAuthStore();
