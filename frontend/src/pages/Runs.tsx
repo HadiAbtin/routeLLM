@@ -13,7 +13,7 @@ export function Runs() {
 
   const { data: stats, isLoading: loading } = useQuery({
     queryKey: ['runs-stats', 60],
-    queryFn: () => statsApi.getRunsStats(60).then(res => res.data),
+    queryFn: () => statsApi.getRunsStats(60).then((res: any) => res.data),
     enabled: !!token,
     refetchInterval: 10000,
   });

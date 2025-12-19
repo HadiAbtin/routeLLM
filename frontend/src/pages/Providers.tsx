@@ -11,14 +11,14 @@ export function Providers() {
 
   const { data: statsData } = useQuery({
     queryKey: ['providers-stats'],
-    queryFn: () => statsApi.getProvidersStats().then(res => res.data),
+    queryFn: () => statsApi.getProvidersStats().then((res: any) => res.data),
     enabled: !!token,
     refetchInterval: 10000,
   });
 
   const { data: timeseriesData } = useQuery({
     queryKey: ['providers-timeseries', 60, 60],
-    queryFn: () => statsApi.getProvidersTimeseries(60, 60).then(res => res.data),
+    queryFn: () => statsApi.getProvidersTimeseries(60, 60).then((res: any) => res.data),
     enabled: !!token,
     refetchInterval: 10000,
   });
