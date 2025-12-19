@@ -3,7 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 // @ts-ignore
 import { AppLayout } from '../components/AppLayout';
 import { useAuthStore } from '../store/authStore';
-import { statsApi } from '../lib/api.js';
+import { statsApi } from '../lib/api';
 import { TrendingUp, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useState } from 'react';
 

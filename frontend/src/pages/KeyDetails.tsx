@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { AppLayout } from '../components/AppLayout';
-import { statsApi } from '../lib/api.js';
+import { statsApi } from '../lib/api';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ArrowLeft, KeyRound } from 'lucide-react';
 import { useMemo, useState } from 'react';

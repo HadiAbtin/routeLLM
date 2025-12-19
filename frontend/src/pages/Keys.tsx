@@ -3,9 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { AppLayout } from '../components/AppLayout';
 import { useAuthStore } from '../store/authStore';
-import { adminKeysApi, statsApi, type ProviderKeyCreate } from '../lib/api.js';
+import { adminKeysApi, statsApi, type ProviderKeyCreate } from '../lib/api';
 import { ChevronUp, ChevronsUpDown, Plus, X, Trash2 } from 'lucide-react';
-import { cn } from '../lib/utils.js';
+import { cn } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 
 interface KeyStat {

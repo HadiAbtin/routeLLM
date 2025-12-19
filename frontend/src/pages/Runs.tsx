@@ -3,7 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { AppLayout } from '../components/AppLayout';
 import { Button } from '../components/Button';
 import { useAuthStore } from '../store/authStore';
-import { statsApi } from '../lib/api.js';
+import { statsApi } from '../lib/api';
 import { CheckCircle2, XCircle, Clock, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -13,7 +13,7 @@ export function Runs() {
 
   const { data: stats, isLoading: loading } = useQuery({
     queryKey: ['runs-stats', 60],
-    queryFn: () => statsApi.getRunsStats(60).then((res: any) => res.data),
+    queryFn: () => statsApi.getRunsStats(60).then(res => res.data),
     enabled: !!token,
     refetchInterval: 10000,
   });

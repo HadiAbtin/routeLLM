@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { AppLayout } from '../components/AppLayout';
 import { useAuthStore } from '../store/authStore';
-import { statsApi } from '../lib/api.js';
+import { statsApi } from '../lib/api';
 
 export function Providers() {
   const { token } = useAuthStore();
@@ -11,14 +11,14 @@ export function Providers() {
 
   const { data: statsData } = useQuery({
     queryKey: ['providers-stats'],
-    queryFn: () => statsApi.getProvidersStats().then((res: any) => res.data),
+    queryFn: () => statsApi.getProvidersStats().then(res => res.data),
     enabled: !!token,
     refetchInterval: 10000,
   });
 
   const { data: timeseriesData } = useQuery({
     queryKey: ['providers-timeseries', 60, 60],
-    queryFn: () => statsApi.getProvidersTimeseries(60, 60).then((res: any) => res.data),
+    queryFn: () => statsApi.getProvidersTimeseries(60, 60).then(res => res.data),
     enabled: !!token,
     refetchInterval: 10000,
   });
