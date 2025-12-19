@@ -1,6 +1,6 @@
 services:
   backend:
-    image: ${DOCKERHUB_USERNAME:-hadiabtin}/route-llm-gateway-backend:${VERSION:-latest}
+    image: ${DOCKERHUB_USERNAME:-habtinfar}/route-llm-gateway-backend:${VERSION:-latest}
     platform: linux/amd64
     restart: unless-stopped
     container_name: llm-router-core 
@@ -35,7 +35,7 @@ services:
       - shared_net
 
   worker:
-    image: ${DOCKERHUB_USERNAME:-hadiabtin}/route-llm-gateway-backend:${VERSION:-latest}
+    image: ${DOCKERHUB_USERNAME:-habtinfar}/route-llm-gateway-backend:${VERSION:-latest}
     platform: linux/amd64
     restart: unless-stopped
     command: ["python", "worker.py"]
@@ -67,7 +67,7 @@ services:
       - route-llm-network
 
   frontend:
-    image: ${DOCKERHUB_USERNAME:-hadiabtin}/route-llm-gateway-frontend:${VERSION:-latest}
+    image: ${DOCKERHUB_USERNAME:-habtinfar}/route-llm-gateway-frontend:${VERSION:-latest}
     platform: linux/amd64
     restart: unless-stopped
     ports:
