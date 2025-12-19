@@ -71,7 +71,7 @@ services:
     platform: linux/amd64
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT:-80}:80"
+      - "${FRONTEND_PORT:-48586}:80"
     depends_on:
       - backend
     # Note: VITE_API_BASE_URL must be set at BUILD TIME via build args
