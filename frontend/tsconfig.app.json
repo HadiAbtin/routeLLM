@@ -9,11 +9,10 @@
     "skipLibCheck": true,
 
     /* Bundler mode */
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
     "allowImportingTsExtensions": false,
-    "resolvePackageJsonExports": true,
-    "resolvePackageJsonImports": true,
-    "verbatimModuleSyntax": false,
+    "resolvePackageJsonExports": false,
+    "resolvePackageJsonImports": false,
     "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
