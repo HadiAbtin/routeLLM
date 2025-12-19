@@ -98,7 +98,14 @@ class AnthropicProvider(BaseProvider):
                 "content": message.content or ""
             }
         
-        # Return multimodal format
+        # If only one text block and no attachments, use simple string format (matches Anthropic SDK)
+        if len(content_blocks) == 1 and content_blocks[0].get("type") == "text":
+            return {
+                "role": message.role,
+                "content": content_blocks[0].get("text", "")
+            }
+        
+        # Return multimodal format (array) for multiple blocks or attachments
         return {
             "role": message.role,
             "content": content_blocks
@@ -125,8 +132,10 @@ class AnthropicProvider(BaseProvider):
         settings = get_settings()
         
         # Determine model to use (default from config)
-        # Valid models: claude-3-5-sonnet-20241022, claude-3-opus-20240229, claude-3-sonnet-20240229, claude-3-haiku-20240307
+        # Valid models for Claude 4.5: claude-sonnet-4-5-20250929, claude-haiku-4-5-20251001, claude-opus-4-5-20251101
+        # Legacy models: claude-3-5-sonnet-20241022, claude-3-opus-20240229, claude-3-sonnet-20240229, claude-3-haiku-20240307
         model = request.model or settings.anthropic_default_model
+        logger.info(f"🎯 Model selection - Request model: {request.model}, Default: {settings.anthropic_default_model}, Selected: {model}")
         
         # Anthropic API base URL
         base_url = "https://api.anthropic.com/v1"
@@ -176,8 +185,9 @@ class AnthropicProvider(BaseProvider):
             "Content-Type": "application/json"
         }
         
-        # Log for debugging
-        logger.debug(f"Anthropic API request - Model: {model}, Base URL: {base_url}")
+        # Log for debugging - include full payload model
+        logger.info(f"Anthropic API request - Model: {model}, Base URL: {base_url}, Payload model: {payload.get('model')}")
+        logger.debug(f"Full payload: {payload}")
         
         # Configure proxy if available
         if settings.http_proxy:
@@ -203,26 +213,59 @@ class AnthropicProvider(BaseProvider):
         timeout_seconds = settings.provider_timeout_seconds
         async with httpx.AsyncClient(timeout=timeout_seconds) as client:
             try:
+                # Log the exact model being sent to API
+                logger.info(f"🔍 Sending request to Anthropic API")
+                logger.info(f"   Requested model: {model}")
+                logger.info(f"   Payload model field: {payload.get('model')}")
+                logger.info(f"   Full payload model: {payload}")
+                
                 response = await client.post(
                     f"{base_url}/messages",
                     json=payload,
                     headers=headers
                 )
                 
+                logger.info(f"📥 Received response from Anthropic API: {response.status_code}")
+                
                 # Handle non-200 responses
                 if response.status_code != 200:
                     error_body = response.text
-                    logger.error(f"Anthropic API error: {response.status_code} - {error_body}")
+                    content_type = response.headers.get("content-type", "").lower()
                     
-                    # Try to parse error message
-                    try:
-                        error_json = response.json()
-                        # Anthropic error format: {"error": {"type": "...", "message": "..."}}
-                        error_type = error_json.get("error", {}).get("type", "")
-                        error_message = error_json.get("error", {}).get("message", "Unknown error")
-                        full_error = f"{error_type}: {error_message}" if error_type else error_message
-                    except:
-                        full_error = error_body
+                    # Check if response is HTML (e.g., Cloudflare error pages like 520, 521, 522, 523, 524)
+                    is_html_error = content_type.startswith("text/html") or (
+                        response.status_code in [520, 521, 522, 523, 524] and 
+                        ("<html" in error_body.lower() or "cloudflare" in error_body.lower())
+                    )
+                    
+                    if is_html_error:
+                        # Extract meaningful error info from HTML if possible
+                        if response.status_code == 520:
+                            full_error = "Cloudflare Error 520: Origin server connection issue (Anthropic API temporarily unavailable)"
+                        elif response.status_code == 521:
+                            full_error = "Cloudflare Error 521: Origin server refused connection (Anthropic API down)"
+                        elif response.status_code == 522:
+                            full_error = "Cloudflare Error 522: Connection timeout to origin server (Anthropic API timeout)"
+                        elif response.status_code == 523:
+                            full_error = "Cloudflare Error 523: Origin server unreachable (Anthropic API unreachable)"
+                        elif response.status_code == 524:
+                            full_error = "Cloudflare Error 524: Timeout waiting for origin server (Anthropic API timeout)"
+                        else:
+                            full_error = f"Cloudflare/Origin server error {response.status_code}: Anthropic API temporarily unavailable"
+                        logger.error(f"Anthropic API HTML error page: {response.status_code} - {full_error}")
+                    else:
+                        logger.error(f"Anthropic API error: {response.status_code} - {error_body[:500]}")
+                        
+                        # Try to parse error message as JSON
+                        try:
+                            error_json = response.json()
+                            # Anthropic error format: {"error": {"type": "...", "message": "..."}}
+                            error_type = error_json.get("error", {}).get("type", "")
+                            error_message = error_json.get("error", {}).get("message", "Unknown error")
+                            full_error = f"{error_type}: {error_message}" if error_type else error_message
+                        except:
+                            # Not JSON, use text body (truncated for logging)
+                            full_error = error_body[:500] if len(error_body) > 500 else error_body
                     
                     # Parse Retry-After header if present
                     retry_after = None
@@ -238,16 +281,28 @@ class AnthropicProvider(BaseProvider):
                             f"Anthropic API rate limit: {full_error}",
                             retry_after=retry_after
                         )
-                    elif response.status_code >= 500:
-                        raise ProviderTransientError(f"Anthropic API server error: {full_error}")
-                    elif response.status_code == 401 or "authentication" in error_type.lower() or ("invalid" in error_message.lower() and "api-key" in error_message.lower()):
+                    elif response.status_code >= 500 or response.status_code in [520, 521, 522, 523, 524]:
+                        # All 5xx errors and Cloudflare errors are transient
+                        raise ProviderTransientError(f"Anthropic API server error ({response.status_code}): {full_error}")
+                    elif response.status_code == 401:
                         # Authentication errors: disable the key and allow failover to another key
                         raise ProviderAuthenticationError(f"Anthropic API authentication error: {full_error}")
                     else:
-                        raise ProviderClientError(f"Anthropic API client error: {full_error}")
+                        raise ProviderClientError(f"Anthropic API client error ({response.status_code}): {full_error}")
                 
                 # Parse successful response
                 data = response.json()
+                
+                # Get the model from response (Anthropic returns the model name in response)
+                # Use the model from API response if available, otherwise use requested model
+                response_model = data.get("model", model)
+                logger.info(f"Anthropic API response - Requested model: {model}, Response model: {response_model}")
+                
+                # Warn if model mismatch
+                if response_model != model:
+                    logger.warning(f"⚠️ Model mismatch! Requested: {model}, API returned: {response_model}")
+                else:
+                    logger.info(f"✅ Model matches: {model}")
                 
                 # Anthropic API response format is different
                 # Extract the first content block (usually text)
@@ -286,8 +341,9 @@ class AnthropicProvider(BaseProvider):
                         total_tokens=total_tokens
                     )
                 
+                # Return response with model name (from API response or requested model)
                 return ChatResponse(
-                    model=data.get("model", model),
+                    model=response_model,
                     message=response_message,
                     usage=usage
                 )

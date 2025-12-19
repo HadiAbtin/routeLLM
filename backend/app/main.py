@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timezone
 from typing import Dict
 import os
+import logging
 from pathlib import Path
 from app.config import get_settings
 from app.api.v1_llm import router as llm_router
@@ -15,6 +16,13 @@ from app.metrics_endpoint import metrics_router
 from app.db import init_db, SessionLocal
 from app.models import User
 from app.api.auth import get_password_hash
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 # Load settings on startup
 settings = get_settings()

@@ -1,12 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { AppLayout } from '../components/AppLayout';
+import { Button } from '../components/Button';
 import { useAuthStore } from '../store/authStore';
 import { statsApi } from '../lib/api';
 import { CheckCircle2, XCircle, Clock, Activity } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export function Runs() {
   const { token } = useAuthStore();
+  const navigate = useNavigate();
 
   const { data: stats, isLoading: loading } = useQuery({
     queryKey: ['runs-stats', 60],
@@ -62,12 +65,23 @@ export function Runs() {
             </div>
             <p className="text-3xl font-bold text-red-600">{stats.by_status.failed}</p>
           </div>
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 flex flex-col">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium text-slate-600 dark:text-slate-400">Running</h3>
               <Clock className="w-5 h-5 text-blue-500" />
             </div>
-            <p className="text-3xl font-bold text-blue-600">{stats.by_status.running}</p>
+            <p className="text-3xl font-bold text-blue-600 mb-4">{stats.by_status.running}</p>
+            {stats.by_status.running > 0 && (
+              <div className="flex justify-center mt-auto">
+                <Button
+                  variant="primary"
+                  onClick={() => navigate('/runs')}
+                  className="w-full"
+                >
+                  View Progress
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 

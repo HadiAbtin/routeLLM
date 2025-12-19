@@ -186,6 +186,9 @@ async def chat_completion(
             db.commit()
             
             try:
+                # Log the model being requested
+                logger.info(f"📤 Calling provider '{provider_name}' with model: {request.model or 'default'}")
+                
                 # Call provider with selected key and stored files
                 response = await provider.chat(
                     key=selected_key.api_key,

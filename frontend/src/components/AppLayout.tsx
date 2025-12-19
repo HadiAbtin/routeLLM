@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import {
@@ -49,8 +49,34 @@ export function AppLayout({
     navigate('/login');
   };
 
+  // Close sidebar when route changes (mobile only)
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
+  // Prevent body scroll when sidebar is open on mobile
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [sidebarOpen]);
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex">
+      {/* Overlay for mobile */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity duration-300"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Sidebar */}
       <aside className={cn(
         "fixed inset-y-0 left-0 z-50 w-72 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 border-r border-slate-700/50 transform transition-transform duration-300 ease-in-out shadow-2xl",
@@ -122,8 +148,7 @@ export function AppLayout({
 
       {/* Main Content */}
       <div className={cn(
-        "flex-1 flex flex-col min-w-0",
-        sidebarOpen && "pl-72",
+        "flex-1 flex flex-col min-w-0 w-full",
         "lg:pl-0"
       )}>
         {/* Top Bar */}
