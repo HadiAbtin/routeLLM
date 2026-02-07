@@ -64,8 +64,21 @@ class AnthropicProvider(BaseProvider):
                         
                         logger.info(f"Image encoded successfully, size: {len(image_base64)} chars")
                         
-                        # Determine media type
+                        # Determine media type and normalize for Anthropic API
                         mime_type = stored_file.get("mime_type", "image/jpeg")
+                        
+                        # Normalize mime types for Anthropic API compatibility
+                        # Anthropic only accepts: 'image/jpeg', 'image/png', 'image/gif', 'image/webp'
+                        mime_type_mapping = {
+                            "image/jpg": "image/jpeg",
+                            "image/jpeg": "image/jpeg",
+                            "image/png": "image/png",
+                            "image/gif": "image/gif",
+                            "image/webp": "image/webp"
+                        }
+                        mime_type = mime_type_mapping.get(mime_type.lower(), "image/jpeg")
+                        
+                        logger.info(f"Using media_type: {mime_type} for file {att.file_id}")
                         
                         # Anthropic requires base64 with data URI format
                         content_blocks.append({

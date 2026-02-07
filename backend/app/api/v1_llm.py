@@ -81,12 +81,15 @@ def _resolve_stored_files(db: Session, file_ids: Set[str]) -> dict:
     for stored_file in stored_files:
         file_id_str = id_mapping[stored_file.id]
         public_url = f"{settings.public_base_url}/v1/files/{stored_file.id}"
+        storage_path = stored_file.storage_path or ""
+        logger.info(f"Resolved file {file_id_str}: storage_path={storage_path}, filename={stored_file.filename}")
         result[file_id_str] = {
             "id": str(stored_file.id),
             "filename": stored_file.filename,
             "mime_type": stored_file.mime_type,
             "size_bytes": stored_file.size_bytes,
-            "public_url": public_url
+            "public_url": public_url,
+            "storage_path": storage_path  # Required for provider to access file
         }
     
     # Check for missing files
