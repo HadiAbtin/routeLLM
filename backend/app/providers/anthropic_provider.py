@@ -12,6 +12,45 @@ from app.providers.errors import ProviderRateLimitError, ProviderTransientError,
 
 logger = logging.getLogger(__name__)
 
+# PDF support
+try:
+    import PyPDF2
+    PDF_SUPPORT = True
+except ImportError:
+    PDF_SUPPORT = False
+    logger.warning("PyPDF2 not installed, PDF extraction will not work")
+
+
+def detect_image_mime_type(image_data: bytes) -> str:
+    """
+    Detect the actual MIME type of an image from its magic bytes.
+    Returns one of: image/jpeg, image/png, image/gif, image/webp
+    Falls back to image/jpeg if detection fails.
+    """
+    if not image_data:
+        return "image/jpeg"
+    
+    # Check magic bytes (file signatures)
+    # JPEG: FF D8 FF
+    if image_data[:3] == b'\xff\xd8\xff':
+        return "image/jpeg"
+    
+    # PNG: 89 50 4E 47 0D 0A 1A 0A
+    if image_data[:8] == b'\x89\x50\x4E\x47\x0D\x0A\x1A\x0A':
+        return "image/png"
+    
+    # GIF: 47 49 46 38 (GIF8)
+    if image_data[:4] == b'GIF8':
+        return "image/gif"
+    
+    # WebP: RIFF...WEBP
+    if image_data[:4] == b'RIFF' and image_data[8:12] == b'WEBP':
+        return "image/webp"
+    
+    # Fallback
+    logger.warning(f"Could not detect image type from magic bytes, defaulting to image/jpeg")
+    return "image/jpeg"
+
 
 class AnthropicProvider(BaseProvider):
     """Anthropic (Claude) provider implementation."""
@@ -64,8 +103,12 @@ class AnthropicProvider(BaseProvider):
                         
                         logger.info(f"Image encoded successfully, size: {len(image_base64)} chars")
                         
-                        # Determine media type and normalize for Anthropic API
-                        mime_type = stored_file.get("mime_type", "image/jpeg")
+                        # Detect actual MIME type from file content (magic bytes)
+                        # This is more reliable than trusting the stored mime_type
+                        detected_mime_type = detect_image_mime_type(image_data)
+                        
+                        # Also check stored mime_type as fallback
+                        stored_mime_type = stored_file.get("mime_type", "").lower()
                         
                         # Normalize mime types for Anthropic API compatibility
                         # Anthropic only accepts: 'image/jpeg', 'image/png', 'image/gif', 'image/webp'
@@ -76,9 +119,22 @@ class AnthropicProvider(BaseProvider):
                             "image/gif": "image/gif",
                             "image/webp": "image/webp"
                         }
-                        mime_type = mime_type_mapping.get(mime_type.lower(), "image/jpeg")
                         
-                        logger.info(f"Using media_type: {mime_type} for file {att.file_id}")
+                        # Use detected type, but validate it's in the mapping
+                        mime_type = mime_type_mapping.get(detected_mime_type, "image/jpeg")
+                        
+                        # Log if there's a mismatch
+                        if stored_mime_type and stored_mime_type in mime_type_mapping:
+                            mapped_stored = mime_type_mapping.get(stored_mime_type, "image/jpeg")
+                            if mapped_stored != mime_type:
+                                logger.warning(
+                                    f"MIME type mismatch for {att.file_id}: "
+                                    f"stored='{stored_mime_type}' -> '{mapped_stored}', "
+                                    f"detected='{detected_mime_type}' -> '{mime_type}'. "
+                                    f"Using detected type."
+                                )
+                        
+                        logger.info(f"Using media_type: {mime_type} for file {att.file_id} (detected from file content)")
                         
                         # Anthropic requires base64 with data URI format
                         content_blocks.append({
@@ -98,11 +154,61 @@ class AnthropicProvider(BaseProvider):
                             "text": f"[Image: {stored_file.get('filename', 'image')} - failed to encode]"
                         })
                 else:
-                    # For non-image files, add as text reference
-                    content_blocks.append({
-                        "type": "text",
-                        "text": f"[Attached file: {stored_file.get('filename', 'file')}]"
-                    })
+                    # For non-image files, try to extract content based on file type
+                    mime_type = stored_file.get("mime_type", "").lower()
+                    filename = stored_file.get("filename", "")
+                    
+                    # Handle PDF files
+                    if mime_type == "application/pdf" or filename.lower().endswith(".pdf"):
+                        if PDF_SUPPORT:
+                            try:
+                                storage_path_str = stored_file.get("storage_path", "")
+                                storage_path = resolve_storage_path(storage_path_str, att.file_id)
+                                
+                                if storage_path and storage_path.exists():
+                                    logger.info(f"Extracting text from PDF: {storage_path}")
+                                    
+                                    # Extract text from PDF
+                                    with open(storage_path, "rb") as f:
+                                        pdf_reader = PyPDF2.PdfReader(f)
+                                        pdf_text = ""
+                                        for page in pdf_reader.pages:
+                                            pdf_text += page.extract_text() + "\n"
+                                        
+                                        if pdf_text.strip():
+                                            content_blocks.append({
+                                                "type": "text",
+                                                "text": f"Content from PDF file '{filename}':\n\n{pdf_text.strip()}"
+                                            })
+                                            logger.info(f"Extracted {len(pdf_text)} characters from PDF {att.file_id}")
+                                        else:
+                                            content_blocks.append({
+                                                "type": "text",
+                                                "text": f"[PDF file: {filename} - no text content found]"
+                                            })
+                                else:
+                                    logger.warning(f"PDF file not found: {storage_path_str}")
+                                    content_blocks.append({
+                                        "type": "text",
+                                        "text": f"[PDF file: {filename} - file not found]"
+                                    })
+                            except Exception as e:
+                                logger.error(f"Failed to extract text from PDF {att.file_id}: {str(e)}", exc_info=True)
+                                content_blocks.append({
+                                    "type": "text",
+                                    "text": f"[PDF file: {filename} - failed to extract text: {str(e)}]"
+                                })
+                        else:
+                            content_blocks.append({
+                                "type": "text",
+                                "text": f"[PDF file: {filename} - PDF extraction not available]"
+                            })
+                    else:
+                        # For other non-image files, add as text reference
+                        content_blocks.append({
+                            "type": "text",
+                            "text": f"[Attached file: {filename}]"
+                        })
         
         # If no content blocks, return simple text format (backward compatibility)
         if not content_blocks:

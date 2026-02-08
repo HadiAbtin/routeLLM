@@ -7,7 +7,7 @@ from uuid import UUID
 class ChatAttachment(BaseModel):
     """Attachment reference for a chat message."""
     file_id: str = Field(..., description="ID of the uploaded file")
-    type: Literal["image", "file"] = Field(..., description="Type of attachment: 'image' for images, 'file' for other files")
+    type: Literal["image", "file", "document"] = Field(..., description="Type of attachment: 'image' for images, 'file' or 'document' for other files")
 
 
 class ChatMessage(BaseModel):
