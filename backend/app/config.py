@@ -9,7 +9,7 @@ class AppSettings(BaseSettings):
     openai_api_key: Optional[str] = None
     openai_base_url: Optional[str] = None
     openai_default_model: str = "gpt-4o-mini"
-    anthropic_default_model: str = "claude-sonnet-4-5-20250929"  # Valid: claude-sonnet-4-5-20250929, claude-haiku-4-5-20251001, claude-opus-4-5-20251101
+    anthropic_default_model: str = "claude-sonnet-5"  # Valid: claude-sonnet-5, claude-haiku-4-5, claude-opus-4-8
     deepseek_default_model: str = "deepseek-chat"
     gemini_default_model: str = "gemini-pro"
     http_proxy: Optional[str] = None  # For HTTP proxy support

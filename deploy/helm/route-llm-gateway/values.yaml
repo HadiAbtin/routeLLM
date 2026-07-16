@@ -36,7 +36,7 @@ env:
   openaiDefaultModel: "gpt-4o-mini"
   
   # Anthropic defaults
-  anthropicDefaultModel: "claude-3-5-haiku-20241022"
+  anthropicDefaultModel: "claude-sonnet-5"
   
   # DeepSeek defaults
   deepseekDefaultModel: "deepseek-chat"

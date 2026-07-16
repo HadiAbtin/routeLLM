@@ -24,6 +24,14 @@ class ChatRequest(BaseModel):
     temperature: Optional[float] = Field(None, ge=0.0, le=2.0, description="Sampling temperature")
     max_tokens: Optional[int] = Field(None, gt=0, description="Maximum tokens to generate")
     provider: Optional[str] = Field("openai", description="Provider to use (e.g. 'openai', 'anthropic')")
+    thinking: Optional[dict] = Field(
+        None,
+        description=(
+            "Anthropic thinking config, passed through verbatim. "
+            "Newer models (Sonnet 5) enable adaptive thinking when this is omitted; "
+            "send {'type': 'disabled'} to opt out."
+        ),
+    )
 
 
 class Usage(BaseModel):

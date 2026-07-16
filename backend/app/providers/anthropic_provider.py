@@ -251,8 +251,8 @@ class AnthropicProvider(BaseProvider):
         settings = get_settings()
         
         # Determine model to use (default from config)
-        # Valid models for Claude 4.5: claude-sonnet-4-5-20250929, claude-haiku-4-5-20251001, claude-opus-4-5-20251101
-        # Legacy models: claude-3-5-sonnet-20241022, claude-3-opus-20240229, claude-3-sonnet-20240229, claude-3-haiku-20240307
+        # Current models: claude-opus-4-8, claude-sonnet-5, claude-haiku-4-5
+        # Model IDs are passed through to Anthropic unvalidated; the API rejects unknown ones.
         model = request.model or settings.anthropic_default_model
         logger.info(f"🎯 Model selection - Request model: {request.model}, Default: {settings.anthropic_default_model}, Selected: {model}")
         
@@ -275,7 +275,7 @@ class AnthropicProvider(BaseProvider):
         
         # Prepare payload for Anthropic API
         # Use request max_tokens if provided, otherwise use default from settings
-        # Anthropic has model-specific limits (e.g., claude-opus-4-5: 64000, claude-sonnet-4-5: 8192)
+        # Anthropic has model-specific limits; the API enforces them and errors if exceeded.
         # We'll use the default and let API enforce its limits (it will return an error if exceeded)
         max_tokens = request.max_tokens or settings.default_max_tokens
         
@@ -296,6 +296,12 @@ class AnthropicProvider(BaseProvider):
         # Add optional parameters
         if request.temperature is not None:
             payload["temperature"] = request.temperature
+
+        # Sonnet 5 and later run adaptive thinking when this is omitted, which
+        # spends output tokens and eats into max_tokens. Callers that want the
+        # pre-Sonnet-5 behaviour must send {"type": "disabled"} explicitly.
+        if request.thinking is not None:
+            payload["thinking"] = request.thinking
         
         # Prepare headers for Anthropic API
         headers = {
