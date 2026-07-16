@@ -438,18 +438,21 @@ class AnthropicProvider(BaseProvider):
                         detail="Anthropic API returned empty content"
                     )
                 
-                # Get the first text content block
-                first_content = content_blocks[0]
-                if first_content.get("type") != "text":
+                # Take the first text block. Responses can lead with blocks we
+                # don't surface — thinking on Sonnet 5 and later, redacted_thinking,
+                # server tool use — so position 0 is not reliably the answer.
+                text_blocks = [b for b in content_blocks if b.get("type") == "text"]
+                if not text_blocks:
+                    types = ", ".join(sorted({b.get("type", "?") for b in content_blocks}))
                     raise HTTPException(
                         status_code=500,
-                        detail=f"Unsupported content type: {first_content.get('type')}"
+                        detail=f"Anthropic response carried no text block (types: {types})"
                     )
-                
+
                 # Build response message
                 response_message = ChatResponseMessage(
                     role="assistant",
-                    content=first_content.get("text", "")
+                    content=text_blocks[0].get("text", "")
                 )
                 
                 # Extract usage if present
